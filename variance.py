@@ -11,7 +11,7 @@ def load_data():
     df = pd.read_excel("TTD Stock Comparison On 29-Sep-2025 2.Xlsx")  # Replace with your Excel file path
     df.columns = df.columns.str.strip()
 
-    # Ensure Diff Stock column
+    # Calculate stock difference
     if 'Diff Stock' not in df.columns:
         df['Diff Stock'] = df['Phys Stock'] - df['Book Stock']
 
@@ -19,7 +19,7 @@ def load_data():
     df['Book Value'] = df['Book Stock'] * df[cost_col]
     df['Phys Value'] = df['Phys Stock'] * df[cost_col]
     df['Diff Value'] = df['Diff Stock'] * df[cost_col]
-
+    
     return df
 
 df = load_data()
@@ -38,14 +38,10 @@ if selected_category != "All":
 total_book_stock = filtered_df['Book Stock'].sum()
 total_phys_stock = filtered_df['Phys Stock'].sum()
 total_diff_stock = filtered_df['Diff Stock'].sum()
-
 total_book_value = filtered_df['Book Value'].sum()
 total_phys_value = filtered_df['Phys Value'].sum()
 total_diff_value = filtered_df['Diff Value'].sum()
-
-stock_variance_pct = (
-    (total_diff_stock / total_book_stock) * 100 if total_book_stock != 0 else 0
-)
+stock_variance_pct = (total_diff_stock / total_book_stock * 100 if total_book_stock != 0 else 0)
 
 # --- Dashboard Title ---
 st.title("📊 TTD Stock Variance Dashboard")
@@ -85,77 +81,141 @@ with col4:
         unsafe_allow_html=True
     )
 
-st.markdown("---")  # Space after summary
+st.markdown("---")  # Separator
 
-# --- Priority: Shortages First, then Excess ---
-shortage_items = filtered_df[filtered_df['Diff Stock'] > 0].sort_values('Diff Stock', ascending=False)
-excess_items = filtered_df[filtered_df['Diff Stock'] < 0].sort_values('Diff Stock')  # Negative values
-priority_items = pd.concat([shortage_items, excess_items])
+# --- Top 30 by Quantity ---
+filtered_df['Abs Diff'] = filtered_df['Diff Stock'].abs()
+top_30_qty = filtered_df.sort_values('Abs Diff', ascending=False).head(30)
 
-# --- Top 30 Priority Items ---
-top_30_priority = priority_items.head(30)
+st.subheader("Top 30 Items: Quantity vs Value")
+fig_qty = go.Figure()
 
-st.subheader("Top 30 Items: Priority by Stock Difference")
-fig_priority = go.Figure()
+fig_qty.add_trace(
+    go.Bar(
+        y=top_30_qty['Item Name'],
+        x=top_30_qty['Diff Stock'],
+        name='Stock Difference (Qty)',
+        orientation='h',
+        marker_color='steelblue',
+        hovertemplate=(
+            "<b>%{y}</b><br>"
+            "Category: %{customdata[0]}<br>"
+            "Item No: %{customdata[1]}<br>"
+            "Barcode: %{customdata[2]}<br>"
+            "Book Stock: %{customdata[3]}<br>"
+            "Phys Stock: %{customdata[4]}<br>"
+            "Stock Diff: %{x}<br>"
+            "Stock Diff Value: AED %{customdata[5]:,.0f}<extra></extra>"
+        ),
+        customdata=top_30_qty[['Category','Item No','Barcode','Book Stock','Phys Stock','Diff Value']]
+    )
+)
 
-# Color: red for shortage, green for excess
-colors = ['red' if x > 0 else 'green' for x in top_30_priority['Diff Stock']]
+fig_qty.add_trace(
+    go.Bar(
+        y=top_30_qty['Item Name'],
+        x=top_30_qty['Diff Value'],
+        name='Stock Difference Value (AED)',
+        orientation='h',
+        marker_color='orange',
+        hovertemplate=(
+            "<b>%{y}</b><br>"
+            "Category: %{customdata[0]}<br>"
+            "Item No: %{customdata[1]}<br>"
+            "Barcode: %{customdata[2]}<br>"
+            "Book Stock: %{customdata[3]}<br>"
+            "Phys Stock: %{customdata[4]}<br>"
+            "Stock Diff: %{customdata[5]}<br>"
+            "Stock Diff Value: AED %{x:,.0f}<extra></extra>"
+        ),
+        customdata=top_30_qty[['Category','Item No','Barcode','Book Stock','Phys Stock','Diff Stock']]
+    )
+)
 
-fig_priority.add_trace(go.Bar(
-    y=top_30_priority['Item Name'],
-    x=top_30_priority['Diff Stock'],
-    name='Stock Difference (Qty)',
-    orientation='h',
-    marker_color=colors,
-    hovertemplate=(
-        "<b>%{y}</b><br>" +
-        "Category: %{customdata[0]}<br>" +
-        "Item No: %{customdata[1]}<br>" +
-        "Barcode: %{customdata[2]}<br>" +
-        "Book Stock: %{customdata[3]}<br>" +
-        "Phys Stock: %{customdata[4]}<br>" +
-        "Stock Diff: %{x}<br>" +
-        "Stock Diff Value: AED %{customdata[5]:,.0f}<extra></extra>"
-    ),
-    customdata=top_30_priority[['Category','Item No','Barcode','Book Stock','Phys Stock','Diff Value']]
-))
-
-fig_priority.add_trace(go.Bar(
-    y=top_30_priority['Item Name'],
-    x=top_30_priority['Diff Value'],
-    name='Stock Difference Value (AED)',
-    orientation='h',
-    marker_color='orange',
-    hovertemplate=(
-        "<b>%{y}</b><br>" +
-        "Category: %{customdata[0]}<br>" +
-        "Item No: %{customdata[1]}<br>" +
-        "Barcode: %{customdata[2]}<br>" +
-        "Book Stock: %{customdata[3]}<br>" +
-        "Phys Stock: %{customdata[4]}<br>" +
-        "Stock Diff: %{customdata[5]}<br>" +
-        "Stock Diff Value: AED %{x:,.0f}<extra></extra>"
-    ),
-    customdata=top_30_priority[['Category','Item No','Barcode','Book Stock','Phys Stock','Diff Stock']]
-))
-
-fig_priority.update_layout(
-    barmode='group', 
-    yaxis=dict(autorange='reversed'), 
+fig_qty.update_layout(
+    barmode='group',
+    yaxis=dict(autorange='reversed'),
     xaxis_title="Quantity / Value",
-    height=800, 
-    legend_title="Metrics", 
+    height=800,
+    legend_title="Metrics",
     margin=dict(t=20, b=20)
 )
-st.plotly_chart(fig_priority, use_container_width=True)
 
-# --- Top 30 Table ---
-st.subheader("📄 Top 30 Items Details (Stock Difference Priority)")
+st.plotly_chart(fig_qty, use_container_width=True)
+
+# --- Top 30 Table by Quantity ---
+st.subheader("📄 Top 30 Items Details (Quantity Priority)")
 key_columns = ['Category', 'Item Name', 'Item No', 'Barcode', 'Book Stock', 'Phys Stock', 'Diff Stock', 'Book Value', 'Phys Value', 'Diff Value']
-available_columns = [col for col in key_columns if col in top_30_priority.columns]
-st.dataframe(top_30_priority[available_columns])
+available_columns = [col for col in key_columns if col in top_30_qty.columns]
+st.dataframe(top_30_qty[available_columns])
+st.markdown("---")
 
-# --- Remaining Items ---
-st.subheader("📄 Remaining Items")
-remaining_df = filtered_df.drop(top_30_priority.index)
+# --- Top 30 by Value ---
+top_30_value = filtered_df.sort_values('Diff Value', ascending=False).head(30)
+
+st.subheader("Top 30 Items: Value Priority")
+fig_val = go.Figure()
+
+fig_val.add_trace(
+    go.Bar(
+        y=top_30_value['Item Name'],
+        x=top_30_value['Diff Stock'],
+        name='Stock Difference (Qty)',
+        orientation='h',
+        marker_color='steelblue',
+        hovertemplate=(
+            "<b>%{y}</b><br>"
+            "Category: %{customdata[0]}<br>"
+            "Item No: %{customdata[1]}<br>"
+            "Barcode: %{customdata[2]}<br>"
+            "Book Stock: %{customdata[3]}<br>"
+            "Phys Stock: %{customdata[4]}<br>"
+            "Stock Diff: %{x}<br>"
+            "Stock Diff Value: AED %{customdata[5]:,.0f}<extra></extra>"
+        ),
+        customdata=top_30_value[['Category','Item No','Barcode','Book Stock','Phys Stock','Diff Value']]
+    )
+)
+
+fig_val.add_trace(
+    go.Bar(
+        y=top_30_value['Item Name'],
+        x=top_30_value['Diff Value'],
+        name='Stock Difference Value (AED)',
+        orientation='h',
+        marker_color='orange',
+        hovertemplate=(
+            "<b>%{y}</b><br>"
+            "Category: %{customdata[0]}<br>"
+            "Item No: %{customdata[1]}<br>"
+            "Barcode: %{customdata[2]}<br>"
+            "Book Stock: %{customdata[3]}<br>"
+            "Phys Stock: %{customdata[4]}<br>"
+            "Stock Diff: %{customdata[5]}<br>"
+            "Stock Diff Value: AED %{x:,.0f}<extra></extra>"
+        ),
+        customdata=top_30_value[['Category','Item No','Barcode','Book Stock','Phys Stock','Diff Stock']]
+    )
+)
+
+fig_val.update_layout(
+    barmode='group',
+    yaxis=dict(autorange='reversed'),
+    xaxis_title="Quantity / Value",
+    height=800,
+    legend_title="Metrics",
+    margin=dict(t=20, b=20)
+)
+
+st.plotly_chart(fig_val, use_container_width=True)
+
+# --- Top 30 Table by Value ---
+st.subheader("📄 Top 30 Items Details (Value Priority)")
+available_columns_value = [col for col in key_columns if col in top_30_value.columns]
+st.dataframe(top_30_value[available_columns_value])
+st.markdown("---")
+
+# --- Remaining data table ---
+st.subheader("📄 All Remaining Items by Category")
+remaining_df = filtered_df.drop(top_30_qty.index.union(top_30_value.index))
 st.dataframe(remaining_df[available_columns].sort_values(['Category','Diff Stock'], ascending=[True, False]))
