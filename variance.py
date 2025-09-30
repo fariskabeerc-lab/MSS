@@ -3,12 +3,12 @@ import pandas as pd
 import plotly.graph_objects as go
 
 # --- Page Config ---
-st.set_page_config(page_title="Stock Variance Dashboard", layout="wide")
+st.set_page_config(page_title="TTD Stock Variance Dashboard", layout="wide")
 
 # --- Load Data Function ---
 @st.cache_data
 def load_data():
-    df = pd.read_excel("stock_data.Xlsx")  # Replace with your Excel file path
+    df = pd.read_excel("TTD Stock Comparison On 29-Sep-2025 2.Xlsx")  # Replace with your Excel file path
     df.columns = df.columns.str.strip()
 
     if 'Diff Stock' not in df.columns:
