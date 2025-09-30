@@ -47,7 +47,7 @@ stock_variance_pct = (
 )
 
 # --- Dashboard Title ---
-st.title("📊 Stock Variance Dashboard")
+st.title("📊 TTD Stock Variance Dashboard")
 
 # --- Summary Section ---
 st.markdown("### 📊 Stock Summary")
